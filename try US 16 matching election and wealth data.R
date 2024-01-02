@@ -30,14 +30,10 @@ anes_data <- read_dta(file.path(extracted_dir, "anes_timeseries_2016.dta"))
 
 # Print the first few rows of the dataset
 head(anes_data)
-# Create a temporary index by counting the hid values
-data_us16_wh$index <- ave(data_us16_wh$hid, data_us16_wh$hid, FUN = seq_along)
-data_us16_wi$index <- ave(data_us16_wi$hid, data_us16_wi$hid, FUN = seq_along)
+# Assuming 'hid' is the household identifier and 'pid' is the personal identifier
 
-# Merge the data sets by hid and index, keeping all observations from wi
-merged_data <- merge(data_us16_wh, data_us16_wi, by = c("hid", "index"), all.y = TRUE)
+# Merge household and personal data based on 'hid' and 'pid'
+merged_data <- merge(data_us16_wh, data_us16_wi, by.x = "hid", by.y = "hid", all.x = TRUE)
 
-# Drop the temporary index
-merged_data$index <- NULL
-
-#issue is that there are more NA in the dataset because the hid is only 996 for 4980 observations 
+# Print the first few rows of the merged dataset to check
+head(merged_data)
