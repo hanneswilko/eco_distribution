@@ -160,3 +160,10 @@ fA.rnd.1 <- create.fused(data.rec = data_us16_wi1, data.don = anes_data_selected
                        mtc.ids = rnd.1$mtc.ids, z.vars = c("V162034a"))
 unique(fA.rnd.1$V162034a)
 
+# Assuming 'hid' is the household identifier and 'pid' is the personal identifier
+
+# Merge household and personal data based on 'hid' and 'pid'
+merged_data <- merge(data_us16_wh, fA.rnd.1, by.x = "hid", by.y = "hid", all.x = TRUE)
+
+# Print the first few rows of the merged dataset to check
+head(merged_data)
