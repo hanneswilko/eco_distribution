@@ -7,18 +7,18 @@ library(haven)
 library(acid)
 library(StatMatch)
 getwd()
-setwd("C:/Users/ducie/Documents/WU/distribution field/Project")
+setwd("/Users/hannes/Documents/Studium/Master/Third_Semester/Economics_of_distribution/seminar/research_project/data/lws")
 
 
 # Read the data file
-data_us16_wi <- read_dta("us16wp (4).dta")
-data_us16_wh <- read_dta("us16wh (1).dta")
+data_us16_wi <- read_dta("us16wp.dta")
+data_us16_wh <- read_dta("us16wh.dta")
 
 # Set the path to the ZIP file
-zip_file_path <- "C:/Users/ducie/Documents/WU/distribution field/Project/Election data/anes_timeseries_2016_dta.zip"
+zip_file_path <- "/Users/hannes/Documents/Studium/Master/Third_Semester/Economics_of_distribution/seminar/research_project/data/anes/anes_timeseries_2016_dta.zip"
 
 # Set the directory where you want to extract the files
-extracted_dir <- "C:/Users/ducie/Documents/WU/distribution field/Project/Election data/"
+extracted_dir <- "/Users/hannes/Documents/Studium/Master/Third_Semester/Economics_of_distribution/seminar/research_project/data/anes/"
 
 # Unzip the file
 unzip(zip_file_path, exdir = extracted_dir)
@@ -59,8 +59,6 @@ data_us16_wi <- data_us16_wi %>%
   ) %>%
   select(-educlev)  # Remove the original variable
 
-library(dplyr)
-
 # Rename V161270 to education and recode values
 anes_data_selected <- anes_data_selected %>%
   mutate(
@@ -78,8 +76,6 @@ anes_data_selected <- anes_data_selected %>%
     )
   ) %>%
   select(-V161270)  # Remove the original variable
-
-
 
 #modify the employment status variable in both sets
 anes_data_selected <- anes_data_selected %>%
@@ -133,9 +129,6 @@ anes_data_selected <- anes_data_selected %>%
   )
 
 # Assuming your data frame is named data_us16_wi
-
-library(dplyr)
-
 data_us16_wi <- data_us16_wi %>%
   mutate(
     income = case_when(
@@ -148,15 +141,22 @@ data_us16_wi <- data_us16_wi %>%
     )
   )
 
-
 # Rename the variable
 data_us16_wi$income <- data_us16_wi$pitotal
 
+### matching process ###
+#Random distance hot deck
 
-# Assuming 'hid' is the household identifier and 'pid' is the personal identifier
+anes_data_selected1 <- anes_data_selected[complete.cases(anes_data_selected$employment), ]
+unique(anes_data_selected1$employment)
+data_us16_wi1 <- data_us16_wi[complete.cases(data_us16_wi$employment), ]
+unique(data_us16_wi1$employment)
 
-# Merge household and personal data based on 'hid' and 'pid'
-merged_data <- merge(data_us16_wh, data_us16_wi, by.x = "hid", by.y = "hid", all.x = TRUE)
+group.v <- c("employment")
+rnd.1 <- RANDwNND.hotdeck(data.rec = data_us16_wi1, data.don = anes_data_selected1,
+                          match.vars = NULL, don.class = group.v)
 
-# Print the first few rows of the merged dataset to check
-head(merged_data)
+fA.rnd.1 <- create.fused(data.rec = data_us16_wi1, data.don = anes_data_selected1,
+                       mtc.ids = rnd.1$mtc.ids, z.vars = c("V162034a"))
+unique(fA.rnd.1$V162034a)
+
