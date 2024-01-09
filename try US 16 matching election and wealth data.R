@@ -148,6 +148,11 @@ data_us16_wi <- data_us16_wi %>%
     )
   )
 
+
+# Rename the variable
+data_us16_wi$income <- data_us16_wi$pitotal
+
+
 # Assuming 'hid' is the household identifier and 'pid' is the personal identifier
 
 # Merge household and personal data based on 'hid' and 'pid'
