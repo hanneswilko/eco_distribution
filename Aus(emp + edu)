@@ -1,0 +1,149 @@
+install.packages("haven")
+library(haven)
+library(dplyr)
+library(tidyverse)
+install.packages("StatMatch")
+library(StatMatch)
+setwd("/Users/rainadasgupta/Desktop/Semester -3/Distri R&P Aus")
+US16 <- read_dta("us16wp.dta")
+Aus_data_2019<- cses5 %>%
+  filter(E1006_NAM == "Australia")
+survey_vars <- c("E1005" , "E1006_NAM" , "E2001_A" , "E2002" , "E2003" , "E2004" , "E2006" , "E2007" , "E2008" , "E2009" , "E2010" , "E2012" , "E2015" , "E2022" , "E3024_3")
+matching_vars <- c("E2003" , "E2010" , "E2006")
+Aus_selected <- Aus_data_2019 %>%
+  select(all_of(c(survey_vars, matching_vars)))
+Aus_selected <- Aus_selected %>%
+  rename(age = E2001_A,
+         gender = E2002,
+         education = E2003,
+         income = E2010,
+         employment = E2006,
+         party_choice = E3024_3,
+         socio_econ_status =  E2008,
+         country = E1006_NAM,
+         marital_stat = E2004,
+         main_occup = E2007,
+         employment_type = E2009,
+         hh_no_members = E2012,
+         race = E2015,
+         rur_urban = E2022)
+
+#left/center-left=q, right/center-right=0; varies/center=2;  
+Aus_selected<- Aus_selected %>%
+  mutate(party_choice_new = case_when(
+    party_choice == 36001 ~ 0,
+    party_choice == 36002 ~ 1,
+    party_choice == 36003 ~ 1,
+    party_choice == 36004 ~ 0,
+    party_choice == 36005 ~ 0,
+    party_choice == 36006 ~ 0,
+    party_choice == 36007 ~ 1,
+    party_choice == 36008 ~ 0,
+    party_choice == 36009 ~ 0,
+    party_choice == 36010 ~ 0,
+    party_choice == 36011 ~ 2,
+    party_choice == 36012 ~ 0,
+    party_choice == 36013 ~ 2,
+    party_choice == 36014 ~ 0,
+    party_choice == 36015 ~ 2,
+    party_choice == 36016 ~ 0,
+    party_choice == 36017 ~ 0,
+    party_choice == 36018 ~ 0,
+    party_choice == 36019 ~ 0,
+    party_choice == 36020 ~ 1,
+    party_choice == 36021 ~ 1,
+    party_choice == 36022 ~ 2,
+    party_choice == 36023 ~ 0,
+    party_choice == 36024 ~ 0,
+    party_choice == 36025 ~ 1,
+    party_choice == 36026 ~ 1,
+    party_choice == 36027 ~ 2,
+    party_choice == 36028 ~ 1,
+    party_choice == 36029 ~ 2,
+    party_choice == 36030 ~ 2,
+    party_choice == 36031 ~ 2,
+    party_choice == 36032 ~ 0,
+    party_choice == 36033 ~ 2,
+    party_choice == 36034 ~ 2,
+    party_choice == 36035 ~ 0,
+    party_choice == 36036 ~ 2,
+    party_choice == 36037 ~ 2,
+    TRUE ~ party_choice ))
+
+#merge of employment categories: employed = 1, unemployed = 0, 97,98,99=NA
+Aus_selected <- Aus_selected %>%
+  mutate(employment_clean = case_when(
+    employment == 1 ~ 1,
+    employment == 2 ~ 1,
+    employment == 3 ~ 1,
+    employment == 4 ~ 1,
+    employment == 5 ~ 0,
+    employment == 6 ~ 0,
+    employment == 7 ~ 0,
+    employment == 8 ~ 0,
+    employment == 9 ~ 0,
+    employment == 10 ~ 0,
+    employment == 11 ~ 0,
+    employment == 12 ~ 0,
+    employment == 13 ~ 0,
+    employment == 14 ~ 0,
+    TRUE ~ employment 
+  ))
+
+#merge of education categories: <=primary = 0; <=secondary = 1; post-secondary = 2; <= undergraduate = 3; >=graduate = 4; 97,98,99=NA
+
+Aus_selected <- Aus_selected %>%
+  mutate(edu_new = case_when(
+    education %in% c(01, 02) ~ 0,                     # <= primary
+    education %in% c(03, 04) ~ 1,                     # <= secondary
+    education %in% c(05, 06) ~ 2,                     # post-secondary
+    education %in% c(07) ~ 3,                         # <= undergraduate
+    education %in% c(08) ~ 4,                         # >= graduate
+    education %in% c(96) ~ NA_integer_,               # NONE (NO EDUCATION)
+    education %in% c(97, 98) ~ NA_integer_,           # VOLUNTEERED: REFUSED or DON'T KNOW
+    education %in% c(99) ~ NA_integer_,               # MISSING
+    TRUE ~ NA_integer_                           # Other cases
+  ))
+
+
+#US16 data clean (education)
+
+
+US16 <- US16 %>%
+  mutate(edu_new = case_when(
+    educlev == 100 | educlev == 110 ~ 0,   # <= primary
+    educlev == 111 ~ NA_integer_,      # NA for never attended
+    educlev == 120 ~ 0,                # <= primary
+    educlev == 130 ~ 1,                # <= secondary
+    educlev == 200 | educlev == 210 ~ 2,   # post-secondary
+    educlev == 220 ~ 2,                # post-secondary non-tertiary
+    educlev == 300 | educlev == 310 ~ 3,   # <= undergraduate
+    educlev == 311 | educlev == 312 | educlev == 313 ~ 4,  # >= graduate
+    educlev == 320 ~ 4,                # >= graduate
+    TRUE ~ NA_integer_             # Other cases (missing)
+  ))
+
+#US16 data clean (emplopyment)
+US16 <- US16 %>%
+  mutate(employment_clean = case_when(
+    emp == 0 ~ 0,
+    emp == 1 ~ 1,
+    TRUE ~ emp
+  ))
+
+#subsets where only the rows with non-missing values for the variable employment_clean are retained
+Aus_selected1 <- Aus_selected[complete.cases(Aus_selected$employment_clean), ]
+US16_1 <- US16[complete.cases(US16$employment_clean), ]
+
+Aus_selected1 <- Aus_selected[complete.cases(Aus_selected$edu_new), ]
+US16_1 <- US16[complete.cases(US16$edu_new), ]
+#matching (?) - works
+group.v <- c("employment_clean")
+rnd.1 <- RANDwNND.hotdeck(data.rec = US16_1, data.don = Aus_selected1,
+                          match.vars = NULL, don.class = group.v)
+
+#matching for education - doesnt work
+group.w <- c("edu_new")
+rnd.2 <- RANDwNND.hotdeck(data.rec = US16_1, data.don = Aus_selected1,
+                          match.vars = NULL, don.class = group.w)
+
