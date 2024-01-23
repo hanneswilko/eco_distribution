@@ -149,7 +149,7 @@ rnd.1 <- RANDwNND.hotdeck(data.rec = merged05_data1, data.don = swe_df06_selecte
 fA.rnd.1 <- create.fused(data.rec = merged05_data1, data.don = swe_df06_selected1,
                          mtc.ids = rnd.1$mtc.ids, z.vars = c("C3023_LH_PL"))
 
-#transforming party categories 96,98,99 to NA
+#transforming party categories 90,92,97,98,99 to NA
 fA.rnd.1 <- fA.rnd.1 %>%
   mutate(C3023_LH_PL_modified =
            ifelse(C3023_LH_PL == 90 | C3023_LH_PL == 92 | C3023_LH_PL == 97 | C3023_LH_PL == 98 | C3023_LH_PL == 99, NA, C3023_LH_PL))
