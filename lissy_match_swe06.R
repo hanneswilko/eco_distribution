@@ -99,7 +99,8 @@ merged05 <- merged05 %>%
       hitotal_quantile == 2 ~ 2,
       hitotal_quantile == 3 ~ 3,
       hitotal_quantile == 4 ~ 4,
-      hitotal_quantile == 5 ~ 5
+      hitotal_quantile == 5 ~ 5,
+      NA ~ TRUE
     )
   ) %>%
   select(-hitotal_quantile)
@@ -110,7 +111,11 @@ swe_df06_selected <- swe_df06_selected %>%
     C2020 == 2 ~ 2,
     C2020 == 3 ~ 3,
     C2020 == 4 ~ 4,
-    C2020 == 5 ~ 5
+    C2020 == 5 ~ 5,
+    C2020 == 7 ~ NA,
+    C2020 == 8 ~ NA,
+    C2020 == 9 ~ NA
+    
   )) %>%
   select(-C2020)
 
@@ -149,10 +154,9 @@ rnd.1 <- RANDwNND.hotdeck(data.rec = merged05_data1, data.don = swe_df06_selecte
 fA.rnd.1 <- create.fused(data.rec = merged05_data1, data.don = swe_df06_selected1,
                          mtc.ids = rnd.1$mtc.ids, z.vars = c("C3023_LH_PL"))
 
-#transforming party categories 90,92,97,98,99 to NA
+#transforming party categories 96,98,99 to NA
 fA.rnd.1 <- fA.rnd.1 %>%
   mutate(C3023_LH_PL_modified =
            ifelse(C3023_LH_PL == 90 | C3023_LH_PL == 92 | C3023_LH_PL == 97 | C3023_LH_PL == 98 | C3023_LH_PL == 99, NA, C3023_LH_PL))
 
-unique(fA.rnd.1$C3023_LH_PL_modified)
-glimpse(fA.rnd.1)
+summary(as.factor(fA.rnd.1$C3023_LH_PL_modified))
