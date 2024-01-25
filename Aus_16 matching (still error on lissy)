@@ -221,7 +221,7 @@ Aus_2016<- Aus_2016[complete.cases(Aus_2016$employment), ]
 US16 <- US16[complete.cases(US16$employment), ]
 
 
-#matching on education
+#matching 
 group.v <- c("employment","income","education")
 rnd.1 <- RANDwNND.hotdeck(data.rec = US16, data.don = Aus_2016,
                           match.vars = NULL, don.class = group.v)
