@@ -86,17 +86,23 @@ swe_df02_selected <- swe_df02_selected %>%
   select(-B2010)
 
 #transforming income variable
+# Create quantiles
+quantiles <- quantile(merged02$hitotal, probs = c(0, 0.15, 0.35, 0.65, 0.85, 1))
+# Create a new variable with quantile labels
+merged02$hitotal_quantile <- cut(merged02$hitotal, breaks = quantiles, labels = FALSE, include.lowest = TRUE)
+
 merged02 <- merged02 %>%
   mutate(
     income = case_when(
-      hitotal < 61131 ~ 1,
-      hitotal >= 61131 & hitotal <= 142218 ~ 2,
-      hitotal >= 142219 & hitotal <= 214785 ~ 3,
-      hitotal >= 214786 & hitotal <= 290802 ~ 4,
-      hitotal > 290802 ~ 5,
-      TRUE ~ NA
+      hitotal_quantile == 1 ~ 1,
+      hitotal_quantile == 2 ~ 2,
+      hitotal_quantile == 3 ~ 3,
+      hitotal_quantile == 4 ~ 4,
+      hitotal_quantile == 5 ~ 5,
+      NA ~ TRUE
     )
-  )
+  ) %>%
+  select(-hitotal_quantile)
 
 swe_df02_selected <- swe_df02_selected %>%
   mutate(income = case_when(
@@ -112,23 +118,14 @@ swe_df02_selected <- swe_df02_selected %>%
   select(-B2020)
 
 # Removing missing values
-swe_df02_selected1 <- swe_df02_selected[complete.cases(swe_df02_selected$employment), ]
-swe_df02_selected1 <- swe_df02_selected[complete.cases(swe_df02_selected$income), ]
-swe_df02_selected1 <- swe_df02_selected[complete.cases(swe_df02_selected$education), ]
-
-merged02_data1 <- merged02[complete.cases(merged02$employment), ]
-merged02_data1 <- merged02[complete.cases(merged02$income), ]
-merged02_data1 <- merged02[complete.cases(merged02$education), ]
+swe_df02_selected1 <- swe_df02_selected[complete.cases(swe_df02_selected[, c("employment", "income", "education")]), ]
+merged02_data1 <- merged02[complete.cases(merged02[, c("employment", "income", "education")]), ]
 
 #The following donation classes in data.don are empty, i.e. there are no donors:
 ##1st-number = employment, 2nd-number = income, 3rd-number = education
-'2.4.1 2.5.1 2.4.3 4.5.3 4.5.1 4.5.2'
+'2.4.1 2.5.1 2.4.3 4.5.3 4.5.2'
 
 #Manually cleaning donor classes for matching
-## 4.5.1 - If employment 4 (retired), income is 5 and education 1 (low) then employment should become 1 (emp)
-swe_df02_selected1$employment <- ifelse(swe_df02_selected1$employment == 4 & swe_df02_selected1$income == 5 & swe_df02_selected1$education == 1, 1, swe_df02_selected1$employment)
-merged02_data1$employment <- ifelse(merged02_data1$employment == 4 & merged02_data1$income == 5 & merged02_data1$education == 1, 1, merged02_data1$employment)
-
 ## 4.5.2 - If employment 1 (emp), income is 5 and education 1 (low) then employment should become 1 (emp)
 swe_df02_selected1$employment <- ifelse(swe_df02_selected1$employment == 4 & swe_df02_selected1$income == 5 & swe_df02_selected1$education == 2, 1, swe_df02_selected1$employment)
 merged02_data1$employment <- ifelse(merged02_data1$employment == 4 & merged02_data1$income == 5 & merged02_data1$education == 2, 1, merged02_data1$employment)
@@ -162,5 +159,4 @@ fA.rnd.1 <- create.fused(data.rec = merged02_data1, data.don = swe_df02_selected
 fA.rnd.1 <- fA.rnd.1 %>%
   mutate(B3006_1_modified = ifelse(B3006_1 == 96 | B3006_1 == 98 | B3006_1 == 99, NA, B3006_1))
 
-unique(fA.rnd.1$B3006_1_modified)
-glimpse(fA.rnd.1)
+summary(as.factor(fA.rnd.1$B3006_1_modified))
