@@ -15,16 +15,19 @@ library(srvyr)
 #data
 data_ger12h <- read.LIS('de12h')
 data_ger12p <- read.LIS('de12p')
-data_ger12r <- read.LIS('de12r')
 ger_df13 <- read_csv(paste(USR_DIR,"/hwilko/cses4_ger13.csv",sep=""))
 
+#create new hid variable
+data_ger12h$hid_i <- paste0(data_ger12h$hid, "-", data_ger12h$inum)
+data_ger12p$hid_i <- paste0(data_ger12p$hid, "-", data_ger12p$inum)
+
 #merge HH and Individual data
-merged12 <- merge(data_ger12h, data_ger12p, by.x = "hid", by.y = "hid", all.x = TRUE)
+merged12 <- merge(data_ger12p, data_ger12h, by= "hid_i", all.x = TRUE)
 
 #create data frame with variables of interest from CSES 
 selected_vars <- c("D2003", "D2020","D2010", "D3006_LH_PL")
-ger_df13_selected <- ger_df13 %>% 
-  select(all_of(selected_vars))
+ger_df13_selected <- ger_df13[, selected_vars]
+
 
 #transforming education categories
 merged12 <- merged12 %>%
@@ -190,12 +193,25 @@ group.v <- c("employment","income","education")
 rnd.1 <- RANDwNND.hotdeck(data.rec = merged12_data1, data.don = ger_df13_selected1,
                           match.vars = NULL, don.class = group.v)
 
-fA.rnd.1 <- create.fused(data.rec = merged12_data1, data.don = ger_df13_selected1,
-                         mtc.ids = rnd.1$mtc.ids, z.vars = c("D3006_LH_PL"))
+fused_ger13 <- create.fused(data.rec = merged12_data1, data.don = ger_df13_selected1,
+                            mtc.ids = rnd.1$mtc.ids, z.vars = c("D3006_LH_PL"))
+
+# control dimensions of different datasets
+dim(data_ger12h)
+dim(data_ger12p) #needs to be same size
+dim(merged12) #needs to be same size
+dim(fused_ger13) #needs to be smaller in size than dim merged12 and ger12p
 
 #transforming party categories 96,98,99 to NA
-fA.rnd.1 <- fA.rnd.1 %>%
+fused_ger13 <- fused_ger13 %>%
   mutate(D3006_LH_PL_modified =
            ifelse(D3006_LH_PL == 90 | D3006_LH_PL == 97 | D3006_LH_PL == 98 | D3006_LH_PL == 99, NA, D3006_LH_PL))
 
-summary(as.factor(fA.rnd.1$D3006_LH_PL_modified))
+# Creating net wealth and net wealth in quantiles
+fused_ger13$netwealth <- (fused_ger13$haf + fused_ger13$han) - (fused_ger13$hlr + fused_ger13$hln)
+
+quantiles <- quantile(fused_ger13$netwealth, probs = c(0, 0.2, 0.4, 0.6, 0.8, 1), na.rm = TRUE)
+fused_ger13$netwealth_quantile <- cut(fused_ger13$netwealth, breaks = quantiles, labels = FALSE, include.lowest = TRUE)
+
+#german survey doesn't include replicate weights --> just use svydesign instead of svrepdesign
+
