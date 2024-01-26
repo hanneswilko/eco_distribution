@@ -15,11 +15,14 @@ library(srvyr)
 #data
 data_swe05h <- read.LIS('se05h')
 data_swe05p <- read.LIS('se05p')
-data_swe05r <- read.LIS('se05r')
 swe_df06 <- read_csv(paste(USR_DIR,"/hwilko/cses3_swe06.csv",sep=""))
 
+#create new hid variable
+data_swe05h$hid_i <- paste0(data_swe05h$hid, "-", data_swe05h$inum)
+data_swe05p$hid_i <- paste0(data_swe05p$hid, "-", data_swe05p$inum)
+
 #merge HH and Individual data
-merged05 <- merge(data_swe05h, data_swe05p, by.x = "hid", by.y = "hid", all.x = TRUE)
+merged05 <- merge(data_swe05h, data_swe05p, by = "hid_i", all.x = TRUE)
 
 #create data frame with variables of interest from CSES 
 selected_vars <- c("C2003", "C2020","C2010", "C3023_LH_PL")
@@ -151,12 +154,12 @@ group.v <- c("employment","income","education")
 rnd.1 <- RANDwNND.hotdeck(data.rec = merged05_data1, data.don = swe_df06_selected1,
                           match.vars = NULL, don.class = group.v)
 
-fA.rnd.1 <- create.fused(data.rec = merged05_data1, data.don = swe_df06_selected1,
+fused_swe06 <- create.fused(data.rec = merged05_data1, data.don = swe_df06_selected1,
                          mtc.ids = rnd.1$mtc.ids, z.vars = c("C3023_LH_PL"))
 
-#transforming party categories 96,98,99 to NA
-fA.rnd.1 <- fA.rnd.1 %>%
-  mutate(C3023_LH_PL_modified =
-           ifelse(C3023_LH_PL == 90 | C3023_LH_PL == 92 | C3023_LH_PL == 97 | C3023_LH_PL == 98 | C3023_LH_PL == 99, NA, C3023_LH_PL))
+# control dimensions of different datasets
+dim(data_swe05h)
+dim(data_swe05p) #needs to be same size
+dim(merged05) #needs to be same size
+dim(fused_swe06) #needs to be smaller in size than dim merged17 and ger17p
 
-summary(as.factor(fA.rnd.1$C3023_LH_PL_modified))
