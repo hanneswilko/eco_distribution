@@ -15,11 +15,14 @@ library(srvyr)
 #data
 data_ger17h <- read.LIS('de17h')
 data_ger17p <- read.LIS('de17p')
-data_ger17r <- read.LIS('de17r')
 ger_df17 <- read_csv(paste(USR_DIR,"/hwilko/cses5_ger17.csv",sep=""))
 
+#create new hid variable
+data_ger17h$hid_i <- paste0(data_ger17h$hid, "-", data_ger17h$inum)
+data_ger17p$hid_i <- paste0(data_ger17p$hid, "-", data_ger17p$inum)
+
 #merge HH and Individual data
-merged17 <- merge(data_ger17h, data_ger17p, by.x = "hid", by.y = "hid", all.x = TRUE)
+merged17 <- merge(data_ger17h, data_ger17p, by = "hid_i", all.x = TRUE)
 
 #create data frame with variables of interest from CSES 
 selected_vars <- c("E2003", "E2006","E2010","E3013_LH_PL")
@@ -164,12 +167,11 @@ group.v <- c("employment","income","education")
 rnd.1 <- RANDwNND.hotdeck(data.rec = merged17_data1, data.don = ger_df17_selected1,
                           match.vars = NULL, don.class = group.v)
 
-fA.rnd.1 <- create.fused(data.rec = merged17_data1, data.don = ger_df17_selected1,
+fused_ger17 <- create.fused(data.rec = merged17_data1, data.don = ger_df17_selected1,
                          mtc.ids = rnd.1$mtc.ids, z.vars = c("E3013_LH_PL"))
 
-#transforming party categories 96,98,99 to NA
-fA.rnd.1 <- fA.rnd.1 %>%
-  mutate(E3013_LH_PL_modified =
-           ifelse(E3013_LH_PL == 90 | E3013_LH_PL == 92 | E3013_LH_PL == 97 | E3013_LH_PL == 98 | E3013_LH_PL == 99, NA, E3013_LH_PL))
-
-summary(as.factor(fA.rnd.1$E3013_LH_PL_modified))
+# control dimensions of different datasets
+dim(data_ger17h)
+dim(data_ger17p) #needs to be same size
+dim(merged17) #needs to be same size
+dim(fused_ger17) #needs to be smaller in size than dim merged17 and ger17p
