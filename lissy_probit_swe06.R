@@ -11,6 +11,7 @@ library(StatMatch)
 library(mice)
 library(devtools)
 library(srvyr)
+library(stargazer)
 
 #data
 data_swe05h <- read.LIS('se05h')
@@ -191,3 +192,10 @@ coef(probit_1)
 probit_2 <- svyglm(vote ~ 1 + netwealth_quantile, family = quasibinomial(link = 'probit'), design = swe.svymi)
 coef(probit_2)
 summary(probit_2)
+
+
+#Output:
+stargazer(probit_1, probit_2,
+          title = "Probit models for Sweden 2002",
+          type = "latex",
+          out = "table1.tex")
