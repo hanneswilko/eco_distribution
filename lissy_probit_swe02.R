@@ -172,8 +172,6 @@ fused_swe02 <- fused_swe02 %>%
     B3006_1 %in% c(96, 98, 99) ~ NA
   ))
 
-summary(as.factor(fused_swe02$vote))
-
 # Creating net wealth and net wealth in quantiles
 fused_swe02$netwealth <- (fused_swe02$haf + fused_swe02$han) - (fused_swe02$hlr + fused_swe02$hln)
 
