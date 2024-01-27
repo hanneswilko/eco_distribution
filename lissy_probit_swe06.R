@@ -179,16 +179,15 @@ fused_swe06$netwealth <- (fused_swe06$haf + fused_swe06$han) - (fused_swe06$hlr 
 quantiles <- quantile(fused_swe06$netwealth, probs = c(0, 0.2, 0.4, 0.6, 0.8, 1), na.rm = TRUE)
 fused_swe06$netwealth_quantile <- cut(fused_swe06$netwealth, breaks = quantiles, labels = FALSE, include.lowest = TRUE)
 
-results <- glm(vote ~ 1 + netwealth, data = fused_swe06, family = quasibinomial(link = 'probit'))
-coef(results)
+# Sample weights:
+swe.svymi <- svydesign(id = ~ hid.x, 
+                       weights = ~ hpopwgt, 
+                       data = fused_swe06)
 
+# Regression
+probit_1 <- svyglm(vote ~ 1 + netwealth, family = quasibinomial(link = 'probit'), design = swe.svymi)
+coef(probit_1)
 
-
-
-
-
-
-
-
-
-
+probit_2 <- svyglm(vote ~ 1 + netwealth_quantile, family = quasibinomial(link = 'probit'), design = swe.svymi)
+coef(probit_2)
+summary(probit_2)
