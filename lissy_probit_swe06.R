@@ -26,7 +26,7 @@ data_swe05p$hid_i <- paste0(data_swe05p$hid, "-", data_swe05p$inum)
 merged05 <- merge(data_swe05h, data_swe05p, by = "hid_i", all.x = TRUE)
 
 #create data frame with variables of interest from CSES 
-selected_vars <- c("C2003", "C2020","C2010", "C3023_LH_PL")
+selected_vars <- c("C2003", "C2020","C2010", "C3023_LH_PL", "C3020_3")
 swe_df06_selected <- swe_df06 %>% 
   select(all_of(selected_vars))
 
@@ -156,7 +156,7 @@ rnd.1 <- RANDwNND.hotdeck(data.rec = merged05_data1, data.don = swe_df06_selecte
                           match.vars = NULL, don.class = group.v)
 
 fused_swe06 <- create.fused(data.rec = merged05_data1, data.don = swe_df06_selected1,
-                            mtc.ids = rnd.1$mtc.ids, z.vars = c("C3023_LH_PL"))
+                            mtc.ids = rnd.1$mtc.ids, z.vars = c("C3023_LH_PL", "C3020_3"))
 
 # control dimensions of different datasets
 dim(data_swe05h)
@@ -164,7 +164,8 @@ dim(data_swe05p) #needs to be same size
 dim(merged05) #needs to be same size
 dim(fused_swe06) #needs to be smaller in size than dim merged17 and ger17p
 
-# Creating modified vote variable --> Right wing = 0 and Left wing = 1
+
+# Creating vote & partisanship variable --> Right wing = 0 and Left wing = 1
 fused_swe06 <- fused_swe06 %>%
   mutate(vote = case_when(
     C3023_LH_PL %in% c(1, 2, 7) ~ 1,
@@ -172,30 +173,93 @@ fused_swe06 <- fused_swe06 %>%
     C3023_LH_PL %in% c(90, 92, 97, 98, 99) ~ NA
   ))
 
-summary(as.factor(fused_swe06$vote))
+fused_swe06 <- fused_swe06 %>%
+  mutate(partisanship = case_when(
+    C3020_3 %in% c(1, 2, 7) ~ 1,
+    C3020_3 %in% c(3, 4, 5, 6) ~ 0,
+    C3020_3 %in% c(90, 97, 99) ~ NA
+  ))
 
-# Creating net wealth and net wealth in quantiles
+# Creating wealth variables
+## net wealth
 fused_swe06$netwealth <- (fused_swe06$haf + fused_swe06$han) - (fused_swe06$hlr + fused_swe06$hln)
-
 quantiles <- quantile(fused_swe06$netwealth, probs = c(0, 0.2, 0.4, 0.6, 0.8, 1), na.rm = TRUE)
 fused_swe06$netwealth_quantile <- cut(fused_swe06$netwealth, breaks = quantiles, labels = FALSE, include.lowest = TRUE)
+
+# wealth
+fused_swe06$wealth <- (fused_swe06$haf + fused_swe06$han)
+quantiles <- quantile(fused_swe06$wealth, probs = c(0, 0.2, 0.4, 0.6, 0.8, 1), na.rm = TRUE)
+fused_swe06$wealth_quantile <- cut(fused_swe06$wealth, breaks = quantiles, labels = FALSE, include.lowest = TRUE)
+
+# financial assets
+quantiles <- quantile(fused_swe06$haf, probs = c(0, 0.2, 0.4, 0.6, 0.8, 1), na.rm = TRUE)
+fused_swe06$haf_quantile <- cut(fused_swe06$haf, breaks = quantiles, labels = FALSE, include.lowest = TRUE)
+
+# non-financial assets
+quantiles <- quantile(fused_swe06$han, probs = c(0, 0.2, 0.4, 0.6, 0.8, 1), na.rm = TRUE, dig.lab = 5)
+fused_swe06$han_quantile <- findInterval(fused_swe06$han, quantiles, rightmost.closed = TRUE)
+
+# business owner
+fused_swe06$status1 <- ifelse(fused_swe06$status1 == "[200]self-employed", 1, 0)
+
+# sex
+fused_swe06$sex <- ifelse(fused_swe06$sex == "[1]male", 0, 
+                          ifelse(fused_swe06$sex == "[2]female", 1, NA))
 
 # Sample weights:
 swe.svymi <- svydesign(id = ~ hid.x, 
                        weights = ~ hpopwgt, 
                        data = fused_swe06)
 
-# Regression
-probit_1 <- svyglm(vote ~ 1 + netwealth, family = quasibinomial(link = 'probit'), design = swe.svymi)
-coef(probit_1)
+# Regressions
+## model 1: net wealth
+model_1 <- svyglm(vote ~ 1 + netwealth_quantile, family = quasibinomial(link = 'probit'), design = swe.svymi)
 
-probit_2 <- svyglm(vote ~ 1 + netwealth_quantile, family = quasibinomial(link = 'probit'), design = swe.svymi)
-coef(probit_2)
-summary(probit_2)
+## model 2: wealth
+model_2 <- svyglm(vote ~ 1 + wealth_quantile, family = quasibinomial(link = 'probit'), design = swe.svymi)
+
+## model 3: financial assets
+model_3 <- svyglm(vote ~ 1 + haf_quantile, family = quasibinomial(link = 'probit'), design = swe.svymi)
+
+## model 4: non-financial assets
+model_4 <- svyglm(vote ~ 1 + han_quantile, family = quasibinomial(link = 'probit'), design = swe.svymi)
 
 
-#Output:
-stargazer(probit_1, probit_2,
-          title = "Probit models for Sweden 2002",
-          type = "latex",
-          out = "table1.tex")
+## model 5: net wealth + age + sex + business owner
+model_5 <- svyglm(vote ~ 1 + netwealth_quantile + age + sex + status1, family = quasibinomial(link = 'probit'), design = swe.svymi)
+
+## model 6: wealth + age + sex + business owner
+model_6 <- svyglm(vote ~ 1 + wealth_quantile + age + sex + status1, family = quasibinomial(link = 'probit'), design = swe.svymi)
+
+## model 7: fin assets + age + sex + business owner
+model_7 <- svyglm(vote ~ 1 + haf_quantile + age + sex + status1, family = quasibinomial(link = 'probit'), design = swe.svymi)
+
+## model 8: non-fin assets + age + sex + business owner
+model_8 <- svyglm(vote ~ 1 + han_quantile + age + sex + status1, family = quasibinomial(link = 'probit'), design = swe.svymi)
+
+
+## model 9: net wealth + age + sex + business owner + income + partisanship
+model_9 <- svyglm(vote ~ 1 + netwealth_quantile + age + sex + status1 + 
+                    income + partisanship, family = quasibinomial(link = 'probit'), design = swe.svymi)
+
+## model 10: wealth + age + sex + business owner + income + partisanship
+model_10 <- svyglm(vote ~ 1 + wealth_quantile + age + sex + status1 + 
+                     income + partisanship, family = quasibinomial(link = 'probit'), design = swe.svymi)
+
+## model 11: fin assets + age + sex + business owner + income + partisanship
+model_11 <- svyglm(vote ~ 1 + haf_quantile + age + sex + status1 + 
+                     income + partisanship, family = quasibinomial(link = 'probit'), design = swe.svymi)
+
+## model 12: fin assets + age + sex + business owner + income + partisanship
+model_12 <- svyglm(vote ~ 1 + han_quantile + age + sex + status1 + 
+                     income + partisanship, family = quasibinomial(link = 'probit'), design = swe.svymi)
+
+
+## model 13: partisanship ~ net wealth
+model_13 <- svyglm(partisanship ~ 1 + netwealth_quantile, family = quasibinomial(link = 'logit'), design = swe.svymi)
+
+
+summary(model_1)
+summary(model_5)
+summary(model_9)
+summary(model_13)
