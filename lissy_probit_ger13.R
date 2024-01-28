@@ -25,7 +25,7 @@ data_ger12p$hid_i <- paste0(data_ger12p$hid, "-", data_ger12p$inum)
 merged12 <- merge(data_ger12p, data_ger12h, by= "hid_i", all.x = TRUE)
 
 #create data frame with variables of interest from CSES 
-selected_vars <- c("D2003", "D2020","D2010", "D3006_LH_PL")
+selected_vars <- c("D2003", "D2020","D2010", "D3006_LH_PL", "D3018_3")
 ger_df13_selected <- ger_df13[, selected_vars]
 
 
@@ -194,7 +194,7 @@ rnd.1 <- RANDwNND.hotdeck(data.rec = merged12_data1, data.don = ger_df13_selecte
                           match.vars = NULL, don.class = group.v)
 
 fused_ger13 <- create.fused(data.rec = merged12_data1, data.don = ger_df13_selected1,
-                         mtc.ids = rnd.1$mtc.ids, z.vars = c("D3006_LH_PL"))
+                         mtc.ids = rnd.1$mtc.ids, z.vars = c("D3006_LH_PL", "D3018_3"))
 
 # control dimensions of different datasets
 dim(data_ger12h)
@@ -202,36 +202,49 @@ dim(data_ger12p) #needs to be same size
 dim(merged12) #needs to be same size
 dim(fused_ger13) #needs to be smaller in size than dim merged12 and ger12p
 
-# Creating modified vote variable --> Right wing = 0 and Left wing = 1
-fused_ger13 <- fused_ger13 %>%
-  mutate(D3006_LH_PL_modified =
-           ifelse(D3006_LH_PL == 90 | D3006_LH_PL == 97 | D3006_LH_PL == 98 | D3006_LH_PL == 99, NA, D3006_LH_PL))
-
+# Creating vote & partisanship variable --> Right wing = 0 and Left wing = 1
 fused_ger13 <- fused_ger13 %>%
   mutate(vote = case_when(
-    D3006_LH_PL_modified == 1 ~ 0, 
-    D3006_LH_PL_modified == 4 ~ 1, 
-    D3006_LH_PL_modified == 5 ~ 1,
-    D3006_LH_PL_modified == 6 ~ 1, 
-    D3006_LH_PL_modified == 7 ~ 0, 
-    D3006_LH_PL_modified == 8 ~ 0,
-    D3006_LH_PL_modified == 9 ~ 1,
-    D3006_LH_PL_modified == 10 ~ 0,
-    D3006_LH_PL_modified == 11 ~ 0,
-    D3006_LH_PL_modified == 12 ~ 1,
-    D3006_LH_PL_modified == 13 ~ 1,
-    D3006_LH_PL_modified == 14 ~ 0,
-    D3006_LH_PL_modified == 17 ~ 0,
-    TRUE ~ NA
+    D3006_LH_PL %in% c(4, 5, 6, 9, 12, 13) ~ 1,
+    D3006_LH_PL %in% c(1, 7, 8, 10, 11, 14, 17) ~ 0,
+    D3006_LH_PL %in% c(90, 97, 98, 99) ~ NA
   ))
 
-# Creating net wealth and net wealth in quantiles
-fused_ger13$netwealth <- (fused_ger13$haf + fused_ger13$han) - (fused_ger13$hlr + fused_ger13$hln)
+fused_ger13 <- fused_ger13 %>%
+  mutate(partisanship = case_when(
+    D3018_3 %in% c(4, 5, 6, 9, 12, 13) ~ 1,
+    D3018_3 %in% c(1, 2, 3, 7, 8, 10, 11, 14, 15, 16) ~ 0,
+    D3018_3 %in% c(97, 98, 99) ~ NA
+  ))
 
+# Creating wealth variables
+## net wealth
+fused_ger13$netwealth <- (fused_ger13$haf + fused_ger13$han) - (fused_ger13$hlr + fused_ger13$hln)
 quantiles <- quantile(fused_ger13$netwealth, probs = c(0, 0.2, 0.4, 0.6, 0.8, 1), na.rm = TRUE)
 fused_ger13$netwealth_quantile <- cut(fused_ger13$netwealth, breaks = quantiles, labels = FALSE, include.lowest = TRUE)
 
-#Weights
+# wealth
+fused_ger13$wealth <- (fused_ger13$haf + fused_ger13$han)
+quantiles <- quantile(fused_ger13$wealth, probs = c(0, 0.2, 0.4, 0.6, 0.8, 1), na.rm = TRUE)
+fused_ger13$wealth_quantile <- cut(fused_ger13$wealth, breaks = quantiles, labels = FALSE, include.lowest = TRUE)
+
+# financial assets
+quantiles <- quantile(fused_ger13$haf, probs = c(0, 0.2, 0.4, 0.6, 0.8, 1), na.rm = TRUE, dig.lab = 5)
+fused_ger13$haf_quantile <- findInterval(fused_ger13$haf, quantiles, rightmost.closed = TRUE)
+
+# non-financial assets
+quantiles <- quantile(fused_ger13$han, probs = c(0, 0.2, 0.4, 0.6, 0.8, 1), na.rm = TRUE, dig.lab = 5)
+fused_ger13$han_quantile <- findInterval(fused_ger13$han, quantiles, rightmost.closed = TRUE)
+
+# business owner
+fused_ger13$status1 <- ifelse(fused_ger13$status1 == "[200]self-employed", 1, 0)
+
+# sex
+fused_ger13$sex <- ifelse(fused_ger13$sex == "[1]male", 0, 
+                          ifelse(fused_ger13$sex == "[2]female", 1, NA))
+
+
+#Imputations: Implicate-weights
 dfs <- c("fused_ger13")
 
 for (i in 1:length(dfs)) {
@@ -242,48 +255,71 @@ for (i in 1:length(dfs)) {
   }
 }
 
-# Get the dimensions of each data frame
+#Get the dimensions of each data frame
 for (j in 1:5) {
   df_name <- paste0("fused_ger13_", j)
   print(paste("The dimensions of", df_name, "are: ", dim(get(df_name))))
 }
 
+#Imputations
 ger.mi <- mitools::imputationList(list(fused_ger13_1, fused_ger13_2, fused_ger13_3, fused_ger13_4, fused_ger13_5))
 
 class(ger.mi)
 
-# Creating survey design for weights
+#Creating survey design
 ger.svymi <- svydesign(id=~hid.x, 
                     weights=~hpopwgt, 
                     data=ger.mi)
 
-#Regression:
-combined_results <- MIcombine(with(ger.svymi, svyglm(vote ~ 1 + netwealth, family = quasibinomial(link = 'probit'))))
-coef(combined_results)
+
+# Regressions
+## model 1: net wealth
+model_1 <- MIcombine(with(ger.svymi, svyglm(vote ~ 1 + netwealth, family = quasibinomial(link = 'probit'))))
+
+## model 2: wealth
+model_2 <- MIcombine(with(ger.svymi, svyglm(vote ~ 1 + wealth_quantile, family = quasibinomial(link = 'probit'))))
+
+## model 3: financial assets
+model_3 <- MIcombine(with(ger.svymi, svyglm(vote ~ 1 + haf_quantile, family = quasibinomial(link = 'probit'))))
+
+## model 4: non-financial assets
+model_4 <- MIcombine(with(ger.svymi, svyglm(vote ~ 1 + han_quantile, family = quasibinomial(link = 'probit'))))
 
 
+## model 5: net wealth + age + sex + business owner
+model_5 <- MIcombine(with(ger.svymi, svyglm(vote ~ 1 + netwealth_quantile + age + sex + status1, family = quasibinomial(link = 'probit'))))
+
+## model 6: wealth + age + sex + business owner
+model_6 <- MIcombine(with(ger.svymi, svyglm(vote ~ 1 + wealth_quantile + age + sex + status1, family = quasibinomial(link = 'probit'))))
+
+## model 7: fin assets + age + sex + business owner
+model_7 <- MIcombine(with(ger.svymi, svyglm(vote ~ 1 + haf_quantile + age + sex + status1, family = quasibinomial(link = 'probit'))))
+
+## model 8: non-fin assets + age + sex + business owner
+model_8 <- MIcombine(with(ger.svymi, svyglm(vote ~ 1 + han_quantile + age + sex + status1, family = quasibinomial(link = 'probit'))))
 
 
+## model 9: net wealth + age + sex + business owner + income + partisanship
+model_9 <- MIcombine(with(ger.svymi, svyglm(vote ~ 1 + netwealth_quantile + age + sex + status1 + 
+                                              income + partisanship, family = quasibinomial(link = 'probit'))))
+
+## model 10: wealth + age + sex + business owner + income + partisanship
+model_10 <- MIcombine(with(ger.svymi, svyglm(vote ~ 1 + wealth_quantile + age + sex + status1 + 
+                                              income + partisanship, family = quasibinomial(link = 'probit'))))
+
+## model 11: fin assets + age + sex + business owner + income + partisanship
+model_11 <- MIcombine(with(ger.svymi, svyglm(vote ~ 1 + haf_quantile + age + sex + status1 + 
+                                               income + partisanship, family = quasibinomial(link = 'probit'))))
+
+## model 12: fin assets + age + sex + business owner + income + partisanship
+model_12 <- MIcombine(with(ger.svymi, svyglm(vote ~ 1 + han_quantile + age + sex + status1 + 
+                                               income + partisanship, family = quasibinomial(link = 'probit'))))
 
 
+## model 13: partisanship ~ net wealth
+model_13 <- MIcombine(with(ger.svymi, svyglm(partisanship ~ 1 + netwealth_quantile, family = quasibinomial(link = 'probit'))))
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+coef(model_1)
+coef(model_5)
+coef(model_9)
