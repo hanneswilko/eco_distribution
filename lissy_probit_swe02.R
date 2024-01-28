@@ -69,8 +69,7 @@ merged02 <- merged02 %>%
       lfs == "[330]disabled" ~ 2,
       TRUE ~ NA
     )
-  ) %>%
-  select(-lfs)
+  )
 
 swe_df02_selected <- swe_df02_selected %>%
   mutate(employment = case_when(
@@ -212,8 +211,13 @@ fused_swe02$haf_quantile <- cut(fused_swe02$haf, breaks = quantiles, labels = FA
 quantiles <- quantile(fused_swe02$han, probs = c(0, 0.2, 0.4, 0.6, 0.8, 1), na.rm = TRUE, dig.lab = 5)
 fused_swe02$han_quantile <- findInterval(fused_swe02$han, quantiles, rightmost.closed = TRUE)
 
-# employment
-fused_swe02$employment_dummy <- ifelse(fused_swe02$employment == 1, 1, 0)
+# employment dummy
+fused_swe02 <- fused_swe02 %>%
+  mutate(
+    employment_dummy = ifelse(fused_swe02$lfs == "[100]employed", 1, 0)
+  )
+
+summary(as.factor(fused_swe02$employment_dummy))
 
 # business owner
 fused_swe02$status1 <- ifelse(fused_swe02$status1 == "[200]self-employed", 1, 0)
@@ -245,7 +249,7 @@ model_4 <- svyglm(vote ~ 1 + han_quantile, family = quasibinomial(link = 'probit
 
 ## model 5: net wealth + income + partisanship + business owner + age + gender + employment + retirement
 model_5 <- svyglm(vote ~ 1 + netwealth_quantile + income + status1 + age + sex
-                  + employment_dummy + retirement + partisanship_factor, family = quasibinomial(link = 'probit'), design = swe.svymi)
+                  + employment_dummy, family = quasibinomial(link = 'probit'), design = swe.svymi)
 
 ## model 6: wealth + income + partisanship + business owner + age + gender + employment + retirement
 model_6 <- svyglm(vote ~ 1 + wealth_quantile + income + status1 + age + sex
