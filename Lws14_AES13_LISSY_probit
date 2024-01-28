@@ -1,0 +1,233 @@
+library(tidyverse)
+library(Hmisc)
+library(tidyr)
+library(haven)
+library(acid)
+library(survey)
+library(mitools)
+library(convey)
+library(dplyr)
+library(StatMatch)
+library(mice)
+library(devtools)
+library(srvyr)
+library(survey)
+library(lubridate)
+#data
+AUS14h <- read.LIS('AU14h')
+AUS14p <- read.LIS('AU14p')
+AUS14r <- read.LIS('AU14r')
+unique(AUS14h$inum)
+unique(AUS14p$inum)
+Aus_2013 <- load(paste(USR_DIR, 'rdasgu/2. Australian Election Study, 2013.RData', sep =''))
+#merge HH and Individual data
+data_lws_13 <- merge(AUS14h, AUS14p, by.x = c("hid"), by.y = c("hid"), all = TRUE)
+Aus_2013 <- x %>%
+  select(xb9reps, g3, g4, h1, h2, h17, b1, h6, h8, h10, age, h15)
+Aus_2013<- Aus_2013 %>%
+  rename(vote = xb9reps,
+         education = g3,
+         employment = g4,
+         gender = h1,
+         age = age,
+         income = h15,
+         party_pref = b1,
+         )
+#left/center-left=1, right/center=0;
+Aus_2013 <- Aus_2013 %>%
+  mutate(vote = case_when(
+    vote == 1 ~ 0,
+    vote == 2 ~ 1,
+    vote == 3 ~ 0,
+    vote == 4 ~ 1,
+    vote == 5 ~ 0,
+    vote == 6 ~ 0,
+    vote == 7 ~ 1,
+    vote == 8 ~ 0,
+    vote == 9 ~ 0,
+    vote == 10 ~ 0,
+    vote == 11 ~ 0,
+    vote == 12 ~ 0,
+    vote == 13 ~ 0,
+    vote == 14 ~ 0,
+    vote == 15 ~ 0,
+    vote == 16 ~ 0,
+    vote == 17 ~ 0,
+    vote == 18 ~ 0,
+    vote == 19 ~ 0,
+    vote == 20 ~ 1,
+    vote == 21 ~ 1,
+    vote == 22 ~ 0,
+    vote == 95 ~ 0,
+    vote == 96 ~ 0,
+    vote == 97 ~ 0,
+    vote == 98 ~ 0,
+    vote == -1 ~ NA,
+    TRUE ~ vote
+  )
+)
+#merge of employment categories: employed = 1, unemployed = 0, not in labour force + homemaker + disabled = 3, retired = 4, education = 5, 8,999 = skipped
+Aus_2013 <- Aus_2013 %>%
+  mutate(
+    employment = case_when(
+      employment %in% c(1, 2) ~ 1,
+      employment %in% c(3, 4) ~ 0,
+      employment %in% c(7) ~ 3,
+      employment %in% c(5) ~ 4,
+      employment %in% c(6) ~ 5,
+      employment %in% c(8, -1) ~ NA_integer_,
+      TRUE ~ employment
+    )
+  )
+# Merge on education categories; highest edu level: school; non-degree qualifications:2 ; UG degree: 3; PG degree/diploma: 4
+# For Aus_2016
+Aus_2013 <- Aus_2013 %>%
+  mutate(
+    education = case_when(
+      education %in% c(1) ~ 1,
+      education %in% c(2) ~ 4,
+      education %in% c(3) ~ 3,
+      education %in% c(4) ~ 2,
+      education %in% c(5, 6, 7) ~ 2,  # Combine multiple categories to 2
+      education %in% c(999) ~ NA_integer_,
+      TRUE ~ NA_integer_
+    )
+  )
+#Income quintiles, 1- lowest quintile ; 5- highest quintile
+quantiles <- quantile(Aus_2013$income, probs = c(0, 0.2, 0.4, 0.6, 0.8, 1), na.rm = TRUE)
+# Create a new variable with quantile labels
+Aus_2013$total_quantile <- cut(Aus_2013$income, breaks = quantiles, labels = FALSE, include.lowest = TRUE)
+Aus_2013 <- Aus_2013 %>%
+  mutate(
+    income = case_when(
+      total_quantile  == 1 ~ 1,
+      total_quantile  == 2 ~ 2,
+      total_quantile  == 3 ~ 3,
+      total_quantile  == 4 ~ 4,
+      total_quantile  == 5 ~ 5,
+      TRUE ~ NA
+    )
+  ) %>%
+  select(-total_quantile)
+#partisanship, coded similarly like vote
+Aus_2013 <- Aus_2013 %>%
+  mutate(party_pref = case_when(
+    party_pref == 1 ~ 0,
+    party_pref == 2 ~ 1,
+    party_pref == 3 ~ 0,
+    party_pref == 4 ~ 1,
+    party_pref == 5 ~ 0,
+    party_pref == 6 ~ 0,
+    party_pref == 7 ~ 1,
+    party_pref == 8 ~ 0,
+    party_pref == 9 ~ 0,
+    party_pref == 10 ~ 0,
+    party_pref == 11 ~ 0,
+    party_pref == 12 ~ 0,
+    party_pref == 13 ~ 0,
+    party_pref == 14 ~ 0,
+    party_pref == 15 ~ 0,
+    party_pref == 16 ~ 0,
+    party_pref == 17 ~ 0,
+    party_pref == 18 ~ 0,
+    party_pref == 19 ~ 0,
+    party_pref == 20 ~ 1,
+    party_pref == 21 ~ 1,
+    party_pref == 22 ~ 0,
+    party_pref == 95 ~ 0,
+    party_pref == 96 ~ 0,
+    party_pref == 97 ~ 0,
+    party_pref == 98 ~ 0,
+    party_pref == -1 ~ NA,
+    TRUE ~ party_pref
+  )
+)
+Aus_2013 <- Aus_2013 %>%
+  mutate_all(~ ifelse(. == -1, NA, .))
+#cleaning lws data - AUS13
+#education
+# For data_lws_13
+data_lws_13 <- data_lws_13 %>%
+  rename(education = educlev) %>%
+  mutate(
+    education = case_when(
+      education %in% c("[110]less than primary", "[111]never attended", "[120]primary", "[130] lower secondary",
+                       "[100]low, less than upper secondary", "[200]medium, upper secondary and post-secondary non-tertiary", "[210]upper secondary") ~ 1,
+      education %in% c("[220]post-secondary non-tertiary", "[300]high, tertiary", "[311]short-cycle tertiary", "[310]BA, MA or equivalent, short-cycle tertiary", "[312]bachelor or equivalent") ~ 2,
+      education %in% c("[312]bachelor or equivalent") ~ 3,
+      education %in% c("[313]master or equivalent", "[313]doctor or equivalent") ~ 4,
+      TRUE ~ NA_integer_
+    )
+  )
+#recoding employment levels;  employed = 1, unemployed = 0, not in labour force = 3, retired = 4, education = 5, diasabled = 6, homemaker = 7, 8.9,999 = skipped
+# For data_lws_13
+data_lws_13 <- data_lws_13 %>%
+  mutate(
+    employment = case_when(
+      lfs == "[100]employed" ~ 1,
+      lfs == "[200]unemployed" ~ 0,
+      lfs == c("[300]not in labour force", "[340]homemaker", "[330]disabled") ~ 3,
+      lfs == "[310]retired" ~ 4,
+      lfs == "[320]in education" ~ 5,
+      TRUE ~ NA_integer_
+    )
+  ) %>%
+  select(-lfs)
+#renaming the gender variable
+data_lws_13 <- data_lws_13 %>%
+  rename(gender = sex)
+#transforming income variable
+# Create quantiles
+quantiles <- quantile(data_lws_13$hitotal, probs = c(0, 0.2, 0.4, 0.6, 0.8, 1), na.rm = TRUE)
+# Create a new variable with quantile labels
+data_lws_13$hitotal_quantile <- cut(data_lws_13$hitotal, breaks = quantiles, labels = FALSE, include.lowest = TRUE)
+data_lws_13 <- data_lws_13 %>%
+  mutate(
+    income = case_when(
+      hitotal_quantile == 1 ~ 1,
+      hitotal_quantile == 2 ~ 2,
+      hitotal_quantile == 3 ~ 3,
+      hitotal_quantile == 4 ~ 4,
+      hitotal_quantile == 5 ~ 5,
+      TRUE ~ NA
+    )
+  ) %>%
+  select(-hitotal_quantile)
+#removing NAs
+Aus_2013_1<- Aus_2013[complete.cases(Aus_2013[, c("employment", "income", "education")]), ]
+data_lws_13_1 <- data_lws_13[complete.cases(data_lws_13[, c("employment", "income", "education")]), ]
+#The following donation classes:0.4.1 5.5.4 in data.don are empty, i.e. there are no donors
+Aus_2013_1$employment <- ifelse(Aus_2013_1$employment == 0 & Aus_2013_1$income == 4 & Aus_2013_1$education == 1, 1, Aus_2013_1$employment)
+data_lws_13_1$employment <- ifelse(data_lws_13_1$employment == 0 & data_lws_13_1$income == 4 & data_lws_13_1$education == 1, 1, data_lws_13_1$employment)
+Aus_2013_1$employment <- ifelse(Aus_2013_1$employment == 5 & Aus_2013_1$income == 5 & Aus_2013_1$education == 4, 1, Aus_2013_1$employment)
+data_lws_13_1$employment <- ifelse(data_lws_13_1$employment == 5 & data_lws_13_1$income == 5 & data_lws_13_1$education == 4, 1, data_lws_13_1$employment)
+#matching
+group.v <- c("employment","income","education")
+# Perform the hot deck imputation
+rnd.1 <- RANDwNND.hotdeck(data.rec = data_lws_13_1, data.don = Aus_2013_1,
+                           match.vars = NULL, don.class = group.v)
+fA.rnd.1 <- create.fused(data.rec = data_lws_13_1, data.don = Aus_2013_1,
+                         mtc.ids = rnd.1$mtc.ids, z.vars = c("vote"))
+unique(fA.rnd.1$vote)
+# Print the size of the dataset
+print(paste("The dimensions of the dataset are: ", dim(fA.rnd.1)))
+# control dimensions of different datasets
+dim(AUS14h)
+dim(AUS14p) #needs to be same size
+dim(data_lws_13) #needs to be same size
+dim(fA.rnd.1) #needs to be smaller in size than dim merged and individual
+#####################
+# Creating net wealth and net wealth in quantiles
+fA.rnd.1$netwealth <- (fA.rnd.1$haf + fA.rnd.1$han) - (fA.rnd.1$hlr + fA.rnd.1$hln)
+quantiles <- quantile(fA.rnd.1$netwealth, probs = c(0, 0.2, 0.4, 0.6, 0.8, 1), na.rm = TRUE)
+fA.rnd.1$netwealth_quantile <- cut(fA.rnd.1$netwealth, breaks = quantiles, labels = FALSE, include.lowest = TRUE)
+# Sample weights:
+swe.svymi <- svydesign(id = ~ hid, 
+                       weights = ~ hpopwgt, 
+                       data = fA.rnd.1)
+# Regression
+probit_1 <- svyglm(vote ~ 1 + netwealth, family = quasibinomial(link = 'probit'), design = swe.svymi)
+coef(probit_1)
+probit_2 <- svyglm(vote ~ 1 + netwealth_quantile, family = quasibinomial(link = 'probit'), design = swe.svymi)
+coef(probit_2)
+summary(probit_2)
