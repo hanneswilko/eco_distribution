@@ -163,8 +163,6 @@ dim(data_swe02p) #needs to be same size
 dim(merged02) #needs to be same size
 dim(fused_swe02) #needs to be smaller in size than dim merged17 and ger17p
 
-summary(as.factor(fused_swe02$B3006_1))
-summary(as.factor(fused_swe02$B3035))
 
 # Creating vote & partisanship variable --> Right wing = 0 and Left wing = 1
 fused_swe02 <- fused_swe02 %>%
@@ -178,19 +176,8 @@ fused_swe02 <- fused_swe02 %>%
   mutate(partisanship = case_when(
     B3035 %in% c(1, 2, 7, 9) ~ 1,
     B3035 %in% c(3, 4, 5, 6, 10) ~ 0,
-    B3035 %in% c(98,99) ~ NA
+    B3035 %in% c(98, 99) ~ NA
   ))
-
-fused_swe02 <- fused_swe02 %>%
-  mutate(partisanship_factor = case_when(
-    B3035 == 98 ~ "Independent",
-    B3035 %in% c(1, 2, 7, 9) ~ "Left",
-    B3035 %in% c(3, 4, 5, 6, 10) ~ "Right",
-    B3035 == 99 ~ NA
-  )) %>%
-  mutate(partisanship_factor, factor(partisanship_factor, levels = c("Independent", "Left", "Right")))
-
-summary(fused_swe02$partisanship_factor)
 
 # Creating wealth variables
 ## net wealth
@@ -211,19 +198,8 @@ fused_swe02$haf_quantile <- cut(fused_swe02$haf, breaks = quantiles, labels = FA
 quantiles <- quantile(fused_swe02$han, probs = c(0, 0.2, 0.4, 0.6, 0.8, 1), na.rm = TRUE, dig.lab = 5)
 fused_swe02$han_quantile <- findInterval(fused_swe02$han, quantiles, rightmost.closed = TRUE)
 
-# employment dummy
-fused_swe02 <- fused_swe02 %>%
-  mutate(
-    employment_dummy = ifelse(fused_swe02$lfs == "[100]employed", 1, 0)
-  )
-
-summary(as.factor(fused_swe02$employment_dummy))
-
 # business owner
 fused_swe02$status1 <- ifelse(fused_swe02$status1 == "[200]self-employed", 1, 0)
-
-# retirement
-fused_swe02$retirement <- ifelse(fused_swe02$employment == 3, 1, 0)
 
 # sex
 fused_swe02$sex <- ifelse(fused_swe02$sex == "[1]male", 0, 
@@ -247,26 +223,43 @@ model_3 <- svyglm(vote ~ 1 + haf_quantile, family = quasibinomial(link = 'probit
 ## model 4: non-financial assets
 model_4 <- svyglm(vote ~ 1 + han_quantile, family = quasibinomial(link = 'probit'), design = swe.svymi)
 
-## model 5: net wealth + income + partisanship + business owner + age + gender + employment + retirement
-model_5 <- svyglm(vote ~ 1 + netwealth_quantile + income + status1 + age + sex
-                  + employment_dummy, family = quasibinomial(link = 'probit'), design = swe.svymi)
 
-## model 6: wealth + income + partisanship + business owner + age + gender + employment + retirement
-model_6 <- svyglm(vote ~ 1 + wealth_quantile + income + status1 + age + sex
-                  + employment_dummy + retirement + partisanship_factor, family = quasibinomial(link = 'probit'), design = swe.svymi)
+## model 5: net wealth + age + sex + business owner
+model_5 <- svyglm(vote ~ 1 + netwealth_quantile + age + sex + status1, family = quasibinomial(link = 'probit'), design = swe.svymi)
 
-## model 7: fin assets + income + partisanship + business owner + age + gender + employment + retirement
-model_7 <- svyglm(vote ~ 1 + haf_quantile + income + status1 + age + sex
-                  + employment_dummy + retirement + partisanship_factor, family = quasibinomial(link = 'probit'), design = swe.svymi)
+## model 6: wealth + age + sex + business owner
+model_6 <- svyglm(vote ~ 1 + wealth_quantile + age + sex + status1, family = quasibinomial(link = 'probit'), design = swe.svymi)
 
-## model 8: non-fin assets + income + partisanship + business owner + age + gender + employment + retirement
-model_8 <- svyglm(vote ~ 1 + han_quantile + income + status1 + age + sex
-                  + employment + retirement + partisanship_factor, family = quasibinomial(link = 'probit'), design = swe.svymi)
+## model 7: fin assets + age + sex + business owner
+model_7 <- svyglm(vote ~ 1 + haf_quantile + age + sex + status1, family = quasibinomial(link = 'probit'), design = swe.svymi)
 
-## model 9: partisanship explained by wealth
-model_9 <- svyglm(partisanship ~ 1 + netwealth_quantile, family = quasibinomial(link = 'probit'), design = swe.svymi)
+## model 8: non-fin assets + age + sex + business owner
+model_8 <- svyglm(vote ~ 1 + han_quantile + age + sex + status1, family = quasibinomial(link = 'probit'), design = swe.svymi)
+
+
+## model 9: net wealth + age + sex + business owner + income + partisanship
+model_9 <- svyglm(vote ~ 1 + netwealth_quantile + age + sex + status1 + 
+                    income + partisanship, family = quasibinomial(link = 'probit'), design = swe.svymi)
+
+## model 10: wealth + age + sex + business owner + income + partisanship
+model_10 <- svyglm(vote ~ 1 + wealth_quantile + age + sex + status1 + 
+                     income + partisanship, family = quasibinomial(link = 'probit'), design = swe.svymi)
+
+## model 11: fin assets + age + sex + business owner + income + partisanship
+model_11 <- svyglm(vote ~ 1 + haf_quantile + age + sex + status1 + 
+                     income + partisanship, family = quasibinomial(link = 'probit'), design = swe.svymi)
+
+## model 12: fin assets + age + sex + business owner + income + partisanship
+model_12 <- svyglm(vote ~ 1 + han_quantile + age + sex + status1 + 
+                     income + partisanship, family = quasibinomial(link = 'probit'), design = swe.svymi)
+
+
+## model 13: partisanship ~ net wealth
+model_13 <- svyglm(partisanship ~ 1 + netwealth_quantile, family = quasibinomial(link = 'logit'), design = swe.svymi)
+
 
 summary(model_1)
-summary(model_4)
 summary(model_5)
 summary(model_9)
+summary(model_13)
+
